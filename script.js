@@ -1,88 +1,47 @@
-const KICK_CHATROOM_ID = 1874362; // Tu ID de jikokun
+const KICK_CHATROOM_ID = 1874362; // ID verificado de tu canal jikokun
 const chatContainer = document.getElementById('chat-container');
 const botsIgnorados = ['botrix', 'kickbot', 'nightbot', 'lobito_mensajero', 'jikobot'];
 
-// ========================================================
-// CREDENCIALES OFICIALES DE TU APLICACIÓN EN DEV.KICK.COM
-// ========================================================
-const KICK_CLIENT_ID = "01KV4R1TR2TERA7YASCB2TKRSW";
-const KICK_CLIENT_SECRET = "db808fbca55d5b5bf4d39b2bb13610a008a6faa5c13d7070bed0f9bd3defee1d";
-
-let accessToken = "";
+// Parámetros oficiales de la API pública y global de Kick
+const KICK_WS_URL = "wss://ws-user.kick.com/app/eb1d5f283081a78b93bb?protocol=7&client=js&version=7.4.0&flash=false";
 let socket;
-let heartbeatInterval;
+let pingInterval;
 
-// PASO 1: OBTENER EL TOKEN BEARER AUTORIZADO (OAuth 2.1)
-async function autenticarEnKick() {
-    showSystemStatus("🔑 Autenticando App en Kick Developer...");
-    
-    try {
-        const respuesta = await fetch("https://api.kick.com/oauth/token", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/x-www-form-urlencoded"
-            },
-            body: new URLSearchParams({
-                "grant_type": "client_credentials",
-                "client_id": KICK_CLIENT_ID,
-                "client_secret": KICK_CLIENT_SECRET,
-                "scope": "chat:read" // Permiso de lectura solicitado
-            })
-        });
-
-        if (!respuesta.ok) throw new Error("Kick rechazó las credenciales de la aplicación");
-
-        const data = await respuesta.json();
-        accessToken = data.access_token; // Guardamos el token de acceso seguro
-        
-        console.log("Autenticación exitosa. Token recibido.");
-        
-        // PASO 2: Abrir el canal de datos con el token
-        conectarWebSocketOficial();
-
-    } catch (error) {
-        console.error("Error OAuth:", error);
-        showSystemStatus("❌ Error de Autenticación. Revisa dev.kick.com");
-        // Reintentar iniciar sesión tras 10 segundos en caso de error de red
-        setTimeout(autenticarEnKick, 10000);
-    }
-}
-
-// PASO 2: CONEXIÓN AL WEBSOCKET AUTORIZADO
-function conectarWebSocketOficial() {
-    const KICK_WS_URL = "wss://ws-user.kick.com/app/eb1d5f283081a78b93bb?protocol=7&client=js&version=7.4.0&flash=false";
+function conectarChatKick() {
+    console.log("[Kick API] Inicializando conexión nativa...");
     socket = new WebSocket(KICK_WS_URL);
 
     socket.onopen = () => {
-        console.log("Túnel WebSocket establecido.");
+        console.log("[Kick API] Canal abierto.");
         
-        // Enviamos el token de autenticación (auth) requerido obligatoriamente por Kick
+        // Formato de suscripción requerido por el servidor de Kick
         const subscribePayload = {
             "event": "pusher:subscribe",
             "data": {
-                "channel": `chatrooms.${KICK_CHATROOM_ID}.v2`,
-                "auth": accessToken // Tu firma digital oficial
+                "channel": `chatrooms.${KICK_CHATROOM_ID}.v2`
             }
         };
         socket.send(JSON.stringify(subscribePayload));
         
-        // Mantener viva la conexión con un pulso constante (Heartbeat) cada 25 segundos
-        clearInterval(heartbeatInterval);
-        heartbeatInterval = setInterval(() => {
+        // Mantenemos la conexión viva enviando un pulso (ping) cada 20 segundos
+        clearInterval(pingInterval);
+        pingInterval = setInterval(() => {
             if (socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify({ "event": "pusher:ping", "data": {} }));
             }
-        }, 25000);
-
-        showSystemStatus("🟢 Conexión Oficial API Exitosa - jikokun");
+        }, 20000);
+        
+        showSystemStatus("🟢 Liquid Glass Conectado - jikokun");
     };
 
     socket.onmessage = (event) => {
         try {
             const rawPayload = JSON.parse(event.data);
             
-            if (rawPayload.event === "pusher:pong") return; // Ignorar el eco del latido
+            // Si el servidor de Kick responde a nuestro pulso de vida, lo ignoramos de forma segura
+            if (rawPayload.event === "pusher:pong") return;
 
+            // Cuando la plataforma envíe un mensaje real de chat
             if (rawPayload.event === "App\\Events\\ChatMessageEvent") {
                 let messageData = rawPayload.data;
                 if (typeof messageData === 'string') {
@@ -91,19 +50,18 @@ function conectarWebSocketOficial() {
                 processMessage(messageData);
             }
         } catch (error) {
-            console.error("Error de parsing:", error);
+            console.error("Error procesando trama:", error);
         }
     };
 
     socket.onclose = () => {
-        clearInterval(heartbeatInterval);
-        showSystemStatus("⚠️ Conexión cerrada. Reconectando...");
-        // Volvemos a autenticar para refrescar el token antes de reconectar
-        setTimeout(autenticarEnKick, 5000);
+        clearInterval(pingInterval);
+        showSystemStatus("⚠️ Conexión perdida con Kick. Reconectando...");
+        // Bucle automático de reconexión cada 5 segundos si se interrumpe la red
+        setTimeout(conectarChatKick, 5000);
     };
 }
 
-// PASO 3: PROCESAMIENTO Y PARSEO DEL CHAT
 function processMessage(data) {
     if (!data || !data.content) return;
 
@@ -112,20 +70,22 @@ function processMessage(data) {
     const usernameLower = usernameRaw.trim().toLowerCase();
     let content = data.content;
 
+    // Filtro anti-bots
     if (botsIgnorados.includes(usernameLower) || sender.is_bot) return;
 
+    // Extracción o generación automática de colores elegantes neón
     let userColor = sender.identity?.color || sender.color;
     if (!userColor || userColor === '#000000' || userColor === '#FFFFFF') {
         userColor = generarColorElegante(usernameLower);
     }
     const userColorDim = userColor + '60';
 
-    // Parseador de Emotes oficiales de Kick
+    // Parseador automático de Emotes nativos de Kick
     content = content.replace(/\[emote:(\d+):([^\]]+)\]/g, function(match, emoteId, emoteName) {
         return `<img src="https://files.kick.com/emotes/${emoteId}/fullsize" alt="${emoteName}" class="kick-emote">`;
     });
 
-    // Mapeador de insignias de roles
+    // Mapeo visual de insignias (Streamer, Mods, Subs) en emojis
     let badgesHtml = '';
     const badgesRaw = sender.identity?.badges || [];
     badgesRaw.forEach(b => {
@@ -151,10 +111,12 @@ function processMessage(data) {
 
     chatContainer.appendChild(msgElement);
 
+    // Límite estricto: máximo 4 mensajes simultáneos para optimizar recursos en tu stream
     while (chatContainer.children.length > 4) {
         chatContainer.removeChild(chatContainer.firstChild);
     }
 
+    // Animación Cyberpunk de evaporación líquida neón a los 30 segundos
     setTimeout(() => {
         msgElement.classList.add('evaporating');
         setTimeout(() => {
@@ -172,10 +134,6 @@ function generarColorElegante(str) {
     return colores[Math.abs(hash) % colores.length];
 }
 
-function escapeHTML(str) {
-    return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
-}
-
 function showSystemStatus(text) {
     const statusBubble = document.createElement('div');
     statusBubble.className = 'glass-message';
@@ -190,5 +148,9 @@ function showSystemStatus(text) {
     }, 5000);
 }
 
-// Disparar flujo OAuth oficial al arrancar el widget
-autenticarEnKick();
+function escapeHTML(str) {
+    return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
+}
+
+// Iniciar proceso directo
+conectarChatKick();
