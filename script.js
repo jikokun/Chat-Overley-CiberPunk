@@ -1,122 +1,135 @@
-const KICK_CHATROOM_ID = 1874362; // ID verificado de tu canal jikokun
+const SERVER_IP = "127.0.0.1"; 
+const SERVER_PORT = "4445";
+
 const chatContainer = document.getElementById('chat-container');
 const botsIgnorados = ['botrix', 'kickbot', 'nightbot', 'lobito_mensajero', 'jikobot'];
 
-// Parámetros oficiales de la API pública y global de Kick
-const KICK_WS_URL = "wss://ws-user.kick.com/app/eb1d5f283081a78b93bb?protocol=7&client=js&version=7.4.0&flash=false";
-let socket;
-let pingInterval;
+function conectarConStreamerBot() {
+    console.log(`[Widget] Conectando a Streamer.bot v1.0.4 en puerto ${SERVER_PORT}...`);
+    const ws = new WebSocket(`ws://${SERVER_IP}:${SERVER_PORT}/`);
 
-function conectarChatKick() {
-    console.log("[Kick API] Inicializando conexión nativa...");
-    socket = new WebSocket(KICK_WS_URL);
-
-    socket.onopen = () => {
-        console.log("[Kick API] Canal abierto.");
+    ws.onopen = () => {
+        console.log("¡Conexión local establecida exitosamente!");
         
-        // Formato de suscripción requerido por el servidor de Kick
-        const subscribePayload = {
-            "event": "pusher:subscribe",
-            "data": {
-                "channel": `chatrooms.${KICK_CHATROOM_ID}.v2`
+        const payloadSuscripcion = {
+            "request": "Subscribe",
+            "id": "jikokun-glass-chat",
+            "events": {
+                "Kick": [
+                    "ChatMessage"
+                ]
             }
         };
-        socket.send(JSON.stringify(subscribePayload));
         
-        // Mantenemos la conexión viva enviando un pulso (ping) cada 20 segundos
-        clearInterval(pingInterval);
-        pingInterval = setInterval(() => {
-            if (socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({ "event": "pusher:ping", "data": {} }));
-            }
-        }, 20000);
-        
-        showSystemStatus("🟢 Liquid Glass Conectado - jikokun");
+        ws.send(JSON.stringify(payloadSuscripcion));
+        showSystemStatus("🟢 Sistema Liquid Glass Conectado - jikokun");
     };
 
-    socket.onmessage = (event) => {
+    ws.onmessage = (event) => {
         try {
             const rawPayload = JSON.parse(event.data);
-            
-            // Si el servidor de Kick responde a nuestro pulso de vida, lo ignoramos de forma segura
-            if (rawPayload.event === "pusher:pong") return;
-
-            // Cuando la plataforma envíe un mensaje real de chat
-            if (rawPayload.event === "App\\Events\\ChatMessageEvent") {
-                let messageData = rawPayload.data;
-                if (typeof messageData === 'string') {
-                    messageData = JSON.parse(messageData);
-                }
-                processMessage(messageData);
+            if (rawPayload.data) {
+                processMessage(rawPayload.data);
+            } else if (rawPayload.message) {
+                processMessage(rawPayload);
             }
         } catch (error) {
-            console.error("Error procesando trama:", error);
+            console.error("Fallo decodificando el paquete del bot local:", error);
         }
     };
 
-    socket.onclose = () => {
-        clearInterval(pingInterval);
-        showSystemStatus("⚠️ Conexión perdida con Kick. Reconectando...");
-        // Bucle automático de reconexión cada 5 segundos si se interrumpe la red
-        setTimeout(conectarChatKick, 5000);
+    ws.onclose = () => {
+        showSystemStatus("⚠️ Buscando Streamer.bot... Asegúrate de tenerlo abierto.");
+        setTimeout(conectarConStreamerBot, 5000); 
     };
 }
 
 function processMessage(data) {
-    if (!data || !data.content) return;
+    if (!data) return;
 
-    const sender = data.sender || {};
-    const usernameRaw = sender.username || "Usuario";
+    const messageObj = data.message || data;
+    const userObj = data.user || data.sender || messageObj.user || messageObj.sender || {};
+    
+    // 1. OBTENER NOMBRE DE USUARIO
+    let usernameRaw = "Usuario";
+    if (typeof userObj === 'string') {
+        usernameRaw = userObj;
+    } else {
+        usernameRaw = userObj.username || userObj.name || userObj.displayName || userObj.user_name || data.user_name || data.username || data.userName || "Usuario";
+    }
     const usernameLower = usernameRaw.trim().toLowerCase();
-    let content = data.content;
-
+    
     // Filtro anti-bots
-    if (botsIgnorados.includes(usernameLower) || sender.is_bot) return;
+    if (botsIgnorados.includes(usernameLower) || userObj.is_bot || data.is_bot) return;
 
-    // Extracción o generación automática de colores elegantes neón
-    let userColor = sender.identity?.color || sender.color;
-    if (!userColor || userColor === '#000000' || userColor === '#FFFFFF') {
+    // 2. OBTENER Y PARSEAR EL MENSAJE CON EMOTES
+    let contentRaw = data.messageText || messageObj.message || messageObj.text || data.message || data.text || data.content || "";
+    if (!contentRaw) return;
+
+    let safeContent = escapeHTML(contentRaw);
+
+    // Convertir el formato de emote de Kick [emote:id:nombre] en imágenes reales
+    safeContent = safeContent.replace(/\[emote:(\d+):([^\]]+)\]/g, function(match, emoteId, emoteName) {
+        return `<img src="https://files.kick.com/emotes/${emoteId}/fullsize" alt="${emoteName}" class="kick-emote" style="height: 24px; width: auto; vertical-align: middle; margin: 0 2px;">`;
+    });
+
+    // 3. PROCESADOR DE COLOR ESTILO GLASS NEON
+    let userColor = userObj.color || data.color || "#00f0ff";
+    if (userColor === '#000000' || userColor === '#FFFFFF') {
         userColor = generarColorElegante(usernameLower);
     }
     const userColorDim = userColor + '60';
 
-    // Parseador automático de Emotes nativos de Kick
-    content = content.replace(/\[emote:(\d+):([^\]]+)\]/g, function(match, emoteId, emoteName) {
-        return `<img src="https://files.kick.com/emotes/${emoteId}/fullsize" alt="${emoteName}" class="kick-emote">`;
-    });
-
-    // Mapeo visual de insignias (Streamer, Mods, Subs) en emojis
+    // 4. MAPEADOR DE INSIGNIAS BLINDADO (Especial para Streamer.bot v1.0.4)
     let badgesHtml = '';
-    const badgesRaw = sender.identity?.badges || [];
-    badgesRaw.forEach(b => {
-        const type = b.type.toLowerCase();
-        if (type === 'broadcaster') badgesHtml += '👑';
-        else if (type === 'moderator') badgesHtml += '🛡️';
-        else if (type === 'vip') badgesHtml += '💎';
-        else if (type === 'subscriber') badgesHtml += '⭐';
-    });
+    
+    // Extracción agresiva de propiedades de rol que maneja el bot antiguo
+    const isBroadcaster = (usernameLower === 'jikokun') || data.isBroadcaster || userObj.isBroadcaster || messageObj.isBroadcaster || data.isOwner || userObj.isOwner || false;
+    const isModerator = data.isModerator || userObj.isModerator || messageObj.isModerator || data.isMod || userObj.isMod || false;
+    const isSubscriber = data.isSubscriber || userObj.isSubscriber || messageObj.isSubscriber || data.isSub || userObj.isSub || false;
+    const isVip = data.isVip || userObj.isVip || messageObj.isVip || data.vip || userObj.vip || false;
+    const isOg = data.isOg || userObj.isOg || data.og || userObj.og || false;
 
+    // Inyección ordenada de insignias
+    if (isBroadcaster) {
+        badgesHtml += '<span class="badge streamer" style="margin-right: 5px; font-size: 16px; vertical-align: middle;">👑</span>';
+    } else if (isModerator) {
+        badgesHtml += '<span class="badge mod" style="margin-right: 5px; font-size: 14px; vertical-align: middle;">🛡️</span>';
+    } else if (isVip) {
+        badgesHtml += '<span class="badge vip" style="margin-right: 5px; font-size: 14px; vertical-align: middle;">💎</span>';
+    }
+    
+    // La insignia de suscriptor puede ir junto a la de Moderador o VIP
+    if (isSubscriber && !isBroadcaster) {
+        badgesHtml += '<span class="badge sub" style="margin-right: 5px; font-size: 14px; vertical-align: middle;">⭐</span>';
+    }
+    
+    if (isOg && !isBroadcaster) {
+        badgesHtml += '<span class="badge og" style="margin-right: 5px; font-size: 14px; vertical-align: middle;">🔥</span>';
+    }
+
+    // 5. MAQUETACIÓN DE LA BURBUJA DE CRISTAL LÍQUIDO
     const msgElement = document.createElement('div');
     msgElement.className = 'glass-message';
     msgElement.style.setProperty('--user-color', userColor);
     msgElement.style.setProperty('--user-color-dim', userColorDim);
 
     msgElement.innerHTML = `
-        <div class="message-header">
-            <span class="badges">${badgesHtml}</span>
-            <span class="username">${escapeHTML(usernameRaw)}</span>
+        <div class="message-header" style="display: flex; align-items: center; margin-bottom: 4px;">
+            <span class="badges" style="display: flex; align-items: center;">${badgesHtml}</span>
+            <span class="username" style="font-weight: bold; color: var(--user-color); margin-left: 2px;">${escapeHTML(usernameRaw)}</span>
         </div>
-        <div class="content">${content}</div>
+        <div class="content" style="word-break: break-word; color: #d0f0f8;">${safeContent}</div>
     `;
 
     chatContainer.appendChild(msgElement);
 
-    // Límite estricto: máximo 4 mensajes simultáneos para optimizar recursos en tu stream
+    // Límite de mensajes concurrentes en OBS (Máximo 4)
     while (chatContainer.children.length > 4) {
         chatContainer.removeChild(chatContainer.firstChild);
     }
 
-    // Animación Cyberpunk de evaporación líquida neón a los 30 segundos
+    // Temporizador: Evaporación líquida neón a los 30 segundos
     setTimeout(() => {
         msgElement.classList.add('evaporating');
         setTimeout(() => {
@@ -127,9 +140,7 @@ function processMessage(data) {
 
 function generarColorElegante(str) {
     let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-        hash = str.charCodeAt(i) + ((hash << 5) - hash);
-    }
+    for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
     const colores = ['#FF5E7E', '#00D4FF', '#FFD166', '#06D6A0', '#B185DB', '#FF9F1C'];
     return colores[Math.abs(hash) % colores.length];
 }
@@ -152,5 +163,4 @@ function escapeHTML(str) {
     return str.replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
 }
 
-// Iniciar proceso directo
-conectarChatKick();
+conectarConStreamerBot();
