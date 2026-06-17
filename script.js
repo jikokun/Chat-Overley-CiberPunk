@@ -3,6 +3,7 @@ const SERVER_PORT = "4445";
 
 const chatContainer = document.getElementById('chat-container');
 const botsIgnorados = ['botrix', 'kickbot', 'nightbot', 'lobito_mensajero', 'jikobot'];
+let messageCount = 0; // Contador para alternar mensajes izquierda/derecha
 
 function conectarConStreamerBot() {
     console.log(`[Widget] Conectando a Streamer.bot v1.0.4 en puerto ${SERVER_PORT}...`);
@@ -111,6 +112,15 @@ function processMessage(data) {
     // 5. MAQUETACIÓN DE LA BURBUJA DE CRISTAL LÍQUIDO
     const msgElement = document.createElement('div');
     msgElement.className = 'glass-message';
+    
+    // Alternar entre izquierda y derecha
+    messageCount++;
+    if (messageCount % 2 === 0) {
+        msgElement.classList.add('message-right');
+    } else {
+        msgElement.classList.add('message-left');
+    }
+    
     msgElement.style.setProperty('--user-color', userColor);
     msgElement.style.setProperty('--user-color-dim', userColorDim);
 
@@ -124,8 +134,8 @@ function processMessage(data) {
 
     chatContainer.appendChild(msgElement);
 
-    // Límite de mensajes concurrentes en OBS (Máximo 4)
-    while (chatContainer.children.length > 4) {
+    // Límite de mensajes concurrentes en OBS (Máximo 6)
+    while (chatContainer.children.length > 6) {
         chatContainer.removeChild(chatContainer.firstChild);
     }
 

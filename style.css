@@ -26,15 +26,16 @@ body {
   
   /* ── EL BORDESITO DE CRISTAL INFLADITO ── */
   /* El borde principal es semitransparente para simular el bisel del vidrio */
-  border: 1.5px solid rgba(0, 212, 255, 0.25); 
+  border: 6px solid rgba(0, 212, 255, 0.7); 
   box-shadow:
-    0 0 40px rgba(0, 212, 255, 0.15),
+    0 0 80px rgba(0, 212, 255, 0.5),
+    0 0 120px rgba(0, 212, 255, 0.3),
     /* Sombra interna blanca/celeste muy delgada que crea el reflejo de la curvatura */
-    inset 0 2px 4px rgba(255, 255, 255, 0.15),
-    inset 2px 0 4px rgba(0, 212, 255, 0.1),
-    inset -2px 0 4px rgba(0, 212, 255, 0.1),
+    inset 0 2px 4px rgba(255, 255, 255, 0.25),
+    inset 2px 0 4px rgba(0, 212, 255, 0.3),
+    inset -2px 0 4px rgba(0, 212, 255, 0.3),
     inset 0 -2px 6px rgba(0, 0, 0, 0.6),
-    inset 0 0 20px rgba(0, 212, 255, 0.08);
+    inset 0 0 20px rgba(0, 212, 255, 0.2);
   /* ─────────────────────────────────────── */
 
   overflow: hidden;
@@ -81,6 +82,34 @@ body {
   border-top: none;
 }
 
+/* ISLA FLOTANTE DINÁMICA - DYNAMIC ISLAND */
+.dynamic-island {
+  position: absolute;
+  top: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120px;
+  height: 28px;
+  background: linear-gradient(135deg, rgba(0, 212, 255, 0.15) 0%, rgba(0, 150, 255, 0.1) 100%);
+  border: 1px solid rgba(0, 212, 255, 0.35);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: #ffffff;
+  text-shadow: 0 0 8px rgba(0, 212, 255, 0.6);
+  box-shadow: 
+    0 4px 15px rgba(0, 212, 255, 0.2),
+    inset 0 1px 2px rgba(255, 255, 255, 0.15),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 15;
+  letter-spacing: 0.3px;
+}
+
 .phone-status-icons {
   font-size: 11px;
   color: rgba(0, 212, 255, 0.7);
@@ -91,11 +120,20 @@ body {
   text-shadow: 0 0 5px rgba(0, 212, 255, 0.4);
 }
 
+/* ICONO WIFI SVG */
+.icon-wifi {
+  width: 16px;
+  height: 16px;
+  stroke: #ffffff;
+  color: #ffffff;
+  filter: drop-shadow(0 0 3px rgba(0, 212, 255, 0.6));
+}
+
 /* ÁREA INTERNA DEL CHAT */
 .chat-area {
   flex: 1;
   width: 100%;
-  padding: 15px 20px;
+  padding: 150px 20px 20px 20px;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -113,14 +151,42 @@ body {
   font-size: 13.5px;
   color: #fff;
   max-width: 88%;
-  align-self: flex-start;
-  background: linear-gradient(135deg, rgba(2, 32, 54, 0.75) 0%, rgba(4, 52, 74, 0.65) 100%);
-  border: 1px solid var(--user-color, rgba(0, 212, 255, 0.4));
-  box-shadow: 0 6px 20px var(--user-color-dim, rgba(0, 212, 255, 0.15));
+  background: linear-gradient(135deg, rgba(2, 45, 70, 0.85) 0%, rgba(4, 65, 95, 0.75) 100%);
+  border: 2px solid var(--user-color, rgba(0, 212, 255, 0.7));
+  box-shadow: 0 0 15px var(--user-color, rgba(0, 212, 255, 0.4)), 0 6px 25px var(--user-color-dim, rgba(0, 212, 255, 0.25));
   animation: cloudIn 0.6s cubic-bezier(0.25, 1, 0.5, 1) forwards;
   transition: all 0.5s ease;
   position: relative;
   z-index: 2;
+}
+
+/* ALINEACIÓN IZQUIERDA - COLOR AZUL/CYAN */
+.glass-message.message-left {
+  align-self: flex-start;
+  animation: slideInLeft 0.6s cubic-bezier(0.25, 1, 0.5, 1) forwards, slideOutLeft 0.6s cubic-bezier(0.25, 1, 0.5, 1) forwards 29.4s;
+  background: linear-gradient(135deg, rgba(2, 45, 90, 0.85) 0%, rgba(4, 65, 120, 0.75) 100%);
+  border: 2px solid rgba(0, 180, 255, 0.8);
+  box-shadow: 0 0 15px rgba(0, 180, 255, 0.5), 0 6px 25px rgba(0, 180, 255, 0.3);
+}
+
+.glass-message.message-left .username {
+  color: #00d4ff !important;
+  text-shadow: 0 0 8px rgba(0, 212, 255, 0.8) !important;
+}
+
+/* ALINEACIÓN DERECHA - COLOR MAGENTA/PÚRPURA */
+.glass-message.message-right {
+  align-self: flex-end;
+  animation: slideInRight 0.6s cubic-bezier(0.25, 1, 0.5, 1) forwards, slideOutRight 0.6s cubic-bezier(0.25, 1, 0.5, 1) forwards 29.4s;
+  background: linear-gradient(135deg, rgba(70, 20, 90, 0.85) 0%, rgba(95, 30, 130, 0.75) 100%);
+  border: 2px solid rgba(200, 50, 255, 0.8);
+  box-shadow: 0 0 15px rgba(200, 50, 255, 0.5), 0 6px 25px rgba(200, 50, 255, 0.3);
+}
+
+.glass-message.message-right .username {
+  color: #d066ff !important;
+  text-shadow: 0 0 8px rgba(200, 50, 255, 0.8) !important;
+}
 }
 
 .glass-message::before {
@@ -226,6 +292,55 @@ body {
 }
 
 /* ANIMACIONES */
+
+/* SLIDE LEFT RETURN - ENTRADA */
+@keyframes slideInLeft {
+  0% {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* SLIDE LEFT RETURN - SALIDA */
+@keyframes slideOutLeft {
+  0% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+}
+
+/* SLIDE RIGHT RETURN - ENTRADA (para mensajes derechos) */
+@keyframes slideInRight {
+  0% {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* SLIDE RIGHT RETURN - SALIDA */
+@keyframes slideOutRight {
+  0% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
 @keyframes cloudIn {
   0% {
     opacity: 0;
