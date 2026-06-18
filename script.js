@@ -17,7 +17,8 @@ function conectarConStreamerBot() {
             "id": "jikokun-glass-chat",
             "events": {
                 "Kick": [
-                    "ChatMessage"
+                    "ChatMessage",
+                    "Follow"
                 ]
             }
         };
@@ -29,11 +30,28 @@ function conectarConStreamerBot() {
     ws.onmessage = (event) => {
         try {
             const rawPayload = JSON.parse(event.data);
-            if (rawPayload.data) {
-                processMessage(rawPayload.data);
-            } else if (rawPayload.message) {
-                processMessage(rawPayload);
+            const payload = rawPayload.data || rawPayload;
+            const eventName = (rawPayload.event || rawPayload.type || rawPayload.eventType || rawPayload.name || payload.event || payload.type || payload.eventType || '')
+                .toString()
+                .toLowerCase();
+            const payloadText = JSON.stringify(payload).toLowerCase();
+
+            const isFollowEvent = eventName.includes('follow')
+                || eventName.includes('follower')
+                || payloadText.includes('followed')
+                || payloadText.includes('follower');
+
+            if (isFollowEvent && !payload.message && !payload.text) {
+                showFollowAlert(payload);
+                return;
             }
+
+            if (payload.message || rawPayload.message || payload.text) {
+                processMessage(payload);
+                return;
+            }
+
+            console.debug('[Widget] Evento no chat detectado:', eventName, payload);
         } catch (error) {
             console.error("Fallo decodificando el paquete del bot local:", error);
         }
@@ -51,6 +69,9 @@ function processMessage(data) {
     const messageObj = data.message || data;
     const userObj = data.user || data.sender || messageObj.user || messageObj.sender || {};
     
+    const eventType = data.eventType || data.type || data.event || null;
+    const isFollowEvent = eventType && eventType.toString().toLowerCase().includes('follow');
+
     // 1. OBTENER NOMBRE DE USUARIO
     let usernameRaw = "Usuario";
     if (typeof userObj === 'string') {
@@ -65,6 +86,12 @@ function processMessage(data) {
 
     // 2. OBTENER Y PARSEAR EL MENSAJE CON EMOTES
     let contentRaw = data.messageText || messageObj.message || messageObj.text || data.message || data.text || data.content || "";
+
+    // Mensajes de alerta de seguimiento
+    if (isFollowEvent) {
+        contentRaw = `${usernameRaw} ahora sigue a Jiko 🎉`;
+    }
+
     if (!contentRaw) return;
 
     let safeContent = escapeHTML(contentRaw);
@@ -113,16 +140,21 @@ function processMessage(data) {
     const msgElement = document.createElement('div');
     msgElement.className = 'glass-message';
     
-    // Alternar entre izquierda y derecha
-    messageCount++;
-    if (messageCount % 2 === 0) {
-        msgElement.classList.add('message-right');
+    if (isFollowEvent) {
+        msgElement.classList.add('follow-alert');
+        msgElement.style.setProperty('--user-color', '#ffd700');
+        msgElement.style.setProperty('--user-color-dim', 'rgba(255, 215, 0, 0.25)');
     } else {
-        msgElement.classList.add('message-left');
+        // Alternar entre izquierda y derecha
+        messageCount++;
+        if (messageCount % 2 === 0) {
+            msgElement.classList.add('message-right');
+        } else {
+            msgElement.classList.add('message-left');
+        }
+        msgElement.style.setProperty('--user-color', userColor);
+        msgElement.style.setProperty('--user-color-dim', userColorDim);
     }
-    
-    msgElement.style.setProperty('--user-color', userColor);
-    msgElement.style.setProperty('--user-color-dim', userColorDim);
 
     msgElement.innerHTML = `
         <div class="message-header" style="display: flex; align-items: center; margin-bottom: 4px;">
@@ -167,6 +199,30 @@ function showSystemStatus(text) {
         statusBubble.classList.add('evaporating');
         setTimeout(() => { if (statusBubble.parentNode) chatContainer.removeChild(statusBubble); }, 700);
     }, 5000);
+}
+
+function showFollowAlert(data) {
+    const username = data.user?.username || data.user?.name || data.user?.displayName || data.username || data.name || data.displayName || data.user_name || data.userName || 'Nuevo seguidor';
+    const msgElement = document.createElement('div');
+    msgElement.className = 'glass-message follow-alert';
+    msgElement.innerHTML = `
+        <div class="message-header" style="display: flex; align-items: center; justify-content: center; margin-bottom: 4px;">
+            <span class="username" style="font-weight: 800; color: #ffd700; font-size: 14px; text-shadow: 0 0 12px rgba(255, 215, 0, 0.95);">${escapeHTML(username)}</span>
+        </div>
+        <div class="content" style="word-break: break-word; color: #fff8d2; text-align: center; font-weight: 700;">¡Gracias por seguir a Jiko! ✨</div>
+    `;
+    chatContainer.appendChild(msgElement);
+
+    while (chatContainer.children.length > 6) {
+        chatContainer.removeChild(chatContainer.firstChild);
+    }
+
+    setTimeout(() => {
+        msgElement.classList.add('evaporating');
+        setTimeout(() => {
+            if (msgElement.parentNode) msgElement.parentNode.removeChild(msgElement);
+        }, 700);
+    }, 8000);
 }
 
 function escapeHTML(str) {
