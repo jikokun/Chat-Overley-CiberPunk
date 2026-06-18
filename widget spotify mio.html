@@ -28,14 +28,38 @@
             left: 50%;
             transform: translateX(-50%);
             opacity: 1;
-            transition: opacity 0.8s ease;
             display: flex;
             flex-direction: column;
             align-items: center;
+            /* Entrada: Deslizar hacia abajo (Bandeja de notificaciones) */
+            animation: slideDownNotification 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
         }
         
         .island-wrapper.hidden {
-            opacity: 0;
+            /* Salida: Efecto "Squeeze & Swipe" (Apretar y deslizar) mediante Animación */
+            animation: slideOutSwipe 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+
+        @keyframes slideDownNotification {
+            0% {
+                transform: translateX(-50%) translateY(-60px);
+                opacity: 0;
+            }
+            100% {
+                transform: translateX(-50%) translateY(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes slideOutSwipe {
+            0% {
+                transform: translateX(-50%) translateY(0) rotate(0deg) scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: translateX(150%) translateY(0) rotate(25deg) scale(0.7);
+                opacity: 0;
+            }
         }
 
         /* --- TEXTO "REPRODUCIENDO" FLOTANTE --- */
